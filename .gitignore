@@ -1,0 +1,28 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Xcode
+DerivedData/
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+**/xcshareddata/IDEWorkspaceChecks.plist
+*.xcscmblueprint
+*.xccheckout
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Project secrets (UserDefaults caches the api key locally on simulator,
+# not in this repo, but reserve the slot just in case)
+*.local.env
+secrets.json
+
+# Blog drafts belong in ~/Desktop/博客/, not here
+草稿_*.md
+长文_*.md
+线程_*.md
