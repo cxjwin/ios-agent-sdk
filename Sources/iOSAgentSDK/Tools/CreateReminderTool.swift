@@ -10,7 +10,7 @@ import EventKit
 /// agent loop would prompt for confirmation before executing.
 public struct CreateReminderTool: ToolProtocol {
     public let name = "create_reminder"
-    public let description = "Creates a new reminder in the user's default Reminders list. Input: 'title' (required) and optional 'dueDate' (ISO 8601, e.g., '2026-05-13T15:00:00+08:00')."
+    public let description = "Creates a new reminder in the user's default Reminders list. Input: 'title' (required) and optional 'dueDate' (ISO 8601, e.g., '2026-05-13T15:00:00+08:00'). The dueDate must be in the future — if the user gives a relative time like '今天下午3点' or 'tomorrow', call get_current_datetime first to compute the absolute date, otherwise this tool will reject the call."
 
     public let isReadOnly = false
 
@@ -43,20 +43,7 @@ public struct CreateReminderTool: ToolProtocol {
         #if canImport(EventKit) && os(iOS)
         let store = EKEventStore()
 
-        let granted: Bool
-        if #available(iOS 17, *) {
-            granted = try await store.requestFullAccessToReminders()
-        } else {
-            granted = try await withCheckedThrowingContinuation { cont in
-                store.requestAccess(to: .reminder) { ok, err in
-                    if let err {
-                        cont.resume(throwing: err)
-                    } else {
-                        cont.resume(returning: ok)
-                    }
-                }
-            }
-        }
+        let granted = try await store.requestFullAccessToReminders()
         guard granted else {
             return "Reminders access not granted."
         }
@@ -71,18 +58,25 @@ public struct CreateReminderTool: ToolProtocol {
 
         var dueDescription = ""
         if let dueDateStr {
-            let date = parseISODate(dueDateStr)
-            if let date {
-                reminder.dueDateComponents = Calendar.current.dateComponents(
-                    [.year, .month, .day, .hour, .minute],
-                    from: date
-                )
-                let fmt = DateFormatter()
-                fmt.dateStyle = .short
-                fmt.timeStyle = .short
-                fmt.locale = Locale(identifier: "zh_CN")
-                dueDescription = " (due \(fmt.string(from: date)))"
+            guard let date = parseISODate(dueDateStr) else {
+                return "Could not parse dueDate \"\(dueDateStr)\". Use ISO 8601, e.g., 2026-05-17T15:00:00+08:00."
             }
+            let now = Date()
+            // Allow up to 12h of slack so "this morning's reminder" still works.
+            if date < now.addingTimeInterval(-12 * 3600) {
+                let fmt = ISO8601DateFormatter()
+                fmt.formatOptions = [.withInternetDateTime]
+                return "Refusing to create reminder with past dueDate \(fmt.string(from: date)). Current time is \(fmt.string(from: now)). Recompute the absolute ISO 8601 date (call get_current_datetime if needed) and retry."
+            }
+            reminder.dueDateComponents = Calendar.current.dateComponents(
+                [.year, .month, .day, .hour, .minute],
+                from: date
+            )
+            let fmt = DateFormatter()
+            fmt.dateStyle = .short
+            fmt.timeStyle = .short
+            fmt.locale = Locale(identifier: "zh_CN")
+            dueDescription = " (due \(fmt.string(from: date)))"
         }
 
         try store.save(reminder, commit: true)

@@ -13,6 +13,7 @@ import CoreLocation
 public struct MapsSearchTool: ToolProtocol {
     public let name = "search_nearby_places"
     public let description = "Search for places near the user's current location via MapKit. Input: 'query' (e.g., 'coffee', 'gym', '健身房'), optional 'limit' (max results, default 5)."
+    private let debugLogging: Bool
 
     public var inputSchema: [String: Any] {
         [
@@ -31,7 +32,9 @@ public struct MapsSearchTool: ToolProtocol {
         ]
     }
 
-    public init() {}
+    public init(debugLogging: Bool = false) {
+        self.debugLogging = debugLogging
+    }
 
     public func execute(input: [String: Any]) async throws -> String {
         let query = (input["query"] as? String)?.trimmingCharacters(in: .whitespaces) ?? ""
@@ -41,11 +44,12 @@ public struct MapsSearchTool: ToolProtocol {
         #if canImport(MapKit) && canImport(CoreLocation) && os(iOS)
         let manager = CLLocationManager()
         let status = manager.authorizationStatus
+        AgentDebug.log("search_nearby_places start query=\(query) limit=\(limit) servicesEnabled=\(CLLocationManager.locationServicesEnabled()) auth=\(status.rawValue)", enabled: debugLogging)
         guard status == .authorizedAlways || status == .authorizedWhenInUse else {
             return "Location permission required. Status: \(status.rawValue)."
         }
 
-        let location = try await OneShotLocationFetcher().fetch()
+        let location = try await OneShotLocationFetcher().fetch(debugLogging: debugLogging)
 
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = query
@@ -56,8 +60,10 @@ public struct MapsSearchTool: ToolProtocol {
         )
 
         let search = MKLocalSearch(request: request)
+        AgentDebug.log("search_nearby_places MKLocalSearch start center=\(location.coordinate.latitude),\(location.coordinate.longitude)", enabled: debugLogging)
         let response = try await search.start()
         let items = Array(response.mapItems.prefix(limit))
+        AgentDebug.log("search_nearby_places MKLocalSearch finished total=\(response.mapItems.count) returned=\(items.count)", enabled: debugLogging)
 
         if items.isEmpty {
             return "No results for '\(query)' nearby."

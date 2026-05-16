@@ -56,6 +56,17 @@ public struct SpeakTool: ToolProtocol {
         // Build & enqueue the utterance on the main actor so neither it nor
         // the synthesizer crosses an actor boundary while non-Sendable.
         await MainActor.run {
+            // Configure audio session for spoken playback. Without this, iOS
+            // defaults to `.soloAmbient` which silently swallows TTS output in
+            // many app contexts and obeys the hardware mute switch.
+            // `.playback` + `.spokenAudio` is Apple's recommended TTS combo;
+            // `.duckOthers` lowers other audio (e.g. music) while speaking.
+            #if os(iOS)
+            let session = AVAudioSession.sharedInstance()
+            try? session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+            try? session.setActive(true, options: [])
+            #endif
+
             let utterance = AVSpeechUtterance(string: text)
             utterance.voice = AVSpeechSynthesisVoice(language: language)
                 ?? AVSpeechSynthesisVoice(language: "en-US")

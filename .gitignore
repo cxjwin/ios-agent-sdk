@@ -21,3 +21,6 @@ xcuserdata/
 # not in this repo, but reserve the slot just in case)
 *.local.env
 secrets.json
+
+# Local assistant worktrees
+.claude/

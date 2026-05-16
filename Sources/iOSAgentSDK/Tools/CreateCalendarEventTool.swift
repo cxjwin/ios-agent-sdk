@@ -8,7 +8,7 @@ import EventKit
 /// Symmetric write counterpart to `EventKitTodayTool` (read).
 public struct CreateCalendarEventTool: ToolProtocol {
     public let name = "create_calendar_event"
-    public let description = "Creates a new event in the user's default calendar. Required: 'title' and 'startDate' (ISO 8601). Optional: 'endDate' (defaults to start + 1 hour), 'location', 'notes'."
+    public let description = "Creates a new event in the user's default calendar. Required: 'title' and 'startDate' (ISO 8601). Optional: 'endDate' (defaults to start + 1 hour), 'location', 'notes'. startDate must be in the future — if the user gives a relative time like '明天下午2点' or 'tomorrow', call get_current_datetime first to compute the absolute date, otherwise this tool will reject the call."
 
     public let isReadOnly = false
 
@@ -51,23 +51,20 @@ public struct CreateCalendarEventTool: ToolProtocol {
             end = start.addingTimeInterval(3600)
         }
 
+        let now = Date()
+        if start < now.addingTimeInterval(-12 * 3600) {
+            let fmt = ISO8601DateFormatter()
+            fmt.formatOptions = [.withInternetDateTime]
+            return "Refusing to create event with past startDate \(fmt.string(from: start)). Current time is \(fmt.string(from: now)). Recompute the absolute ISO 8601 date (call get_current_datetime if needed) and retry."
+        }
+        if end <= start {
+            return "endDate (\(end)) must be after startDate (\(start))."
+        }
+
         #if canImport(EventKit) && os(iOS)
         let store = EKEventStore()
 
-        let granted: Bool
-        if #available(iOS 17, *) {
-            granted = try await store.requestFullAccessToEvents()
-        } else {
-            granted = try await withCheckedThrowingContinuation { cont in
-                store.requestAccess(to: .event) { ok, err in
-                    if let err {
-                        cont.resume(throwing: err)
-                    } else {
-                        cont.resume(returning: ok)
-                    }
-                }
-            }
-        }
+        let granted = try await store.requestFullAccessToEvents()
         guard granted else { return "Calendar access not granted." }
 
         guard let defaultCalendar = store.defaultCalendarForNewEvents else {

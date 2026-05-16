@@ -22,7 +22,7 @@ public struct HealthKitStepsTool: ToolProtocol {
         guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount) else {
             return "Step count type unavailable."
         }
-        try await store.requestAuthorization(toShare: [], read: [stepType])
+        try await HealthKitAuth.requestRead(on: store)
 
         let calendar = Calendar.current
         let startOfToday = calendar.startOfDay(for: Date())

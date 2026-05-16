@@ -35,33 +35,51 @@ public enum ToolExecutor {
 
     public static func execute(
         blocks: [ToolUseBlock],
-        tools: [any ToolProtocol]
+        tools: [any ToolProtocol],
+        onResult: (@Sendable (Int, ToolResult) -> Void)? = nil
     ) async -> [ToolResult] {
-        var results: [ToolResult] = []
-        for block in blocks {
-            guard let tool = tools.first(where: { $0.name == block.name }) else {
-                results.append(ToolResult(
-                    toolUseId: block.id,
-                    content: "Unknown tool: \(block.name)",
-                    isError: true
-                ))
-                continue
+        guard !blocks.isEmpty else { return [] }
+
+        return await withTaskGroup(of: (Int, ToolResult).self) { group in
+            for (index, block) in blocks.enumerated() {
+                let tool = tools.first(where: { $0.name == block.name })
+                group.addTask {
+                    let result = await runOne(block: block, tool: tool)
+                    onResult?(index, result)
+                    return (index, result)
+                }
             }
-            do {
-                let output = try await tool.execute(input: block.input)
-                results.append(ToolResult(
-                    toolUseId: block.id,
-                    content: output,
-                    isError: false
-                ))
-            } catch {
-                results.append(ToolResult(
-                    toolUseId: block.id,
-                    content: "Tool error: \(error)",
-                    isError: true
-                ))
+
+            var indexed: [(Int, ToolResult)] = []
+            indexed.reserveCapacity(blocks.count)
+            for await pair in group {
+                indexed.append(pair)
             }
+            indexed.sort { $0.0 < $1.0 }
+            return indexed.map { $0.1 }
         }
-        return results
+    }
+
+    private static func runOne(
+        block: ToolUseBlock,
+        tool: (any ToolProtocol)?
+    ) async -> ToolResult {
+        guard let tool else {
+            return ToolResult(
+                toolUseId: block.id,
+                content: "Unknown tool: \(block.name)",
+                isError: true
+            )
+        }
+        do {
+            let output = try await tool.execute(input: block.input)
+            return ToolResult(toolUseId: block.id, content: output, isError: false)
+        } catch {
+            return ToolResult(
+                toolUseId: block.id,
+                content: "Tool error: \(error)",
+                isError: true
+            )
+        }
     }
 }

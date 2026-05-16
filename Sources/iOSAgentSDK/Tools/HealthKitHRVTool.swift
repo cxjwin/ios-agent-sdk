@@ -22,7 +22,7 @@ public struct HealthKitHRVTool: ToolProtocol {
         guard let hrvType = HKQuantityType.quantityType(forIdentifier: .heartRateVariabilitySDNN) else {
             return "HRV type unavailable."
         }
-        try await store.requestAuthorization(toShare: [], read: [hrvType])
+        try await HealthKitAuth.requestRead(on: store)
 
         let calendar = Calendar.current
         let startOfToday = calendar.startOfDay(for: Date())

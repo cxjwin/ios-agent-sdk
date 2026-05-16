@@ -1,10 +1,29 @@
 import Foundation
 
+private func formatEvent(_ event: AgentEvent) -> String {
+    switch event {
+    case .turnStarted(let n):
+        return "—— Turn \(n) ——"
+    case .llmRequestStarted(let n):
+        return "  ⤵ LLM request (turn \(n))"
+    case .llmResponseReceived(let n, let hasTools):
+        return "  ⤴ LLM response (turn \(n)) hasToolCalls=\(hasTools)"
+    case .toolCallStarted(_, let name, let input):
+        return "  → \(name)(\(AgentDebug.truncate(input, limit: 400)))"
+    case .toolCallFinished(_, let name, let result, let isError):
+        let tag = isError ? "ERROR" : "ok"
+        return "  ← \(name) [\(tag)] \(AgentDebug.truncate(result, limit: 800))"
+    case .finalAnswer(let text):
+        return "★ Final answer (\(text.count) chars): \(AgentDebug.truncate(text, limit: 800))"
+    }
+}
+
 public actor Agent {
     public let model: String
     public let systemPrompt: String?
     public let maxTurns: Int
     public let maxTokens: Int
+    public let debugLogging: Bool
 
     let client: any LLMClient
     let tools: [any ToolProtocol]
@@ -17,7 +36,8 @@ public actor Agent {
         systemPrompt: String? = nil,
         tools: [any ToolProtocol] = [],
         maxTurns: Int = 10,
-        maxTokens: Int = 4096
+        maxTokens: Int = 4096,
+        debugLogging: Bool = false
     ) {
         self.client = client
         self.model = model
@@ -25,6 +45,7 @@ public actor Agent {
         self.tools = tools
         self.maxTurns = maxTurns
         self.maxTokens = maxTokens
+        self.debugLogging = debugLogging
     }
 
     /// Streams ``AgentEvent`` values as the agent loop runs.
@@ -32,12 +53,17 @@ public actor Agent {
     public nonisolated func runStreaming(_ userInput: String) -> AsyncThrowingStream<AgentEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
+                let logEnabled = await self.debugLogging
+                AgentDebug.log("▶ runStreaming userInput=\(AgentDebug.truncate(userInput, limit: 200))", enabled: logEnabled)
                 do {
                     try await self.runInternal(userInput) { event in
+                        AgentDebug.log(formatEvent(event), enabled: logEnabled)
                         continuation.yield(event)
                     }
+                    AgentDebug.log("■ runStreaming finished", enabled: logEnabled)
                     continuation.finish()
                 } catch {
+                    AgentDebug.log("✗ runStreaming threw: \(error)", enabled: logEnabled)
                     continuation.finish(throwing: error)
                 }
             }
@@ -122,16 +148,19 @@ public actor Agent {
                 ))
             }
 
-            let results = await ToolExecutor.execute(blocks: blocks, tools: tools)
-
-            for (block, result) in zip(blocks, results) {
-                emit(.toolCallFinished(
-                    toolUseId: block.id,
-                    name: block.name,
-                    result: result.content,
-                    isError: result.isError
-                ))
-            }
+            let results = await ToolExecutor.execute(
+                blocks: blocks,
+                tools: tools,
+                onResult: { index, result in
+                    let block = blocks[index]
+                    emit(.toolCallFinished(
+                        toolUseId: block.id,
+                        name: block.name,
+                        result: result.content,
+                        isError: result.isError
+                    ))
+                }
+            )
 
             messages.append([
                 "role": "user",

@@ -30,7 +30,7 @@ public struct HealthKitWorkoutsTool: ToolProtocol {
             return "HealthKit not available on this device."
         }
         let workoutType = HKObjectType.workoutType()
-        try await store.requestAuthorization(toShare: [], read: [workoutType])
+        try await HealthKitAuth.requestRead(on: store)
 
         let calendar = Calendar.current
         let now = Date()

@@ -17,22 +17,8 @@ public struct EventKitTodayTool: ToolProtocol {
         #if canImport(EventKit) && os(iOS)
         let store = EKEventStore()
 
-        // iOS 17+ uses requestFullAccessToEvents (read+write).
-        // For read-only we could use requestWriteOnlyAccessToEvents, but reading also needs full.
-        let granted: Bool
-        if #available(iOS 17, *) {
-            granted = try await store.requestFullAccessToEvents()
-        } else {
-            granted = try await withCheckedThrowingContinuation { cont in
-                store.requestAccess(to: .event) { ok, err in
-                    if let err {
-                        cont.resume(throwing: err)
-                    } else {
-                        cont.resume(returning: ok)
-                    }
-                }
-            }
-        }
+        // Reading events on iOS 17+ requires full access (write-only doesn't permit reads).
+        let granted = try await store.requestFullAccessToEvents()
         guard granted else {
             return "Calendar access not granted."
         }

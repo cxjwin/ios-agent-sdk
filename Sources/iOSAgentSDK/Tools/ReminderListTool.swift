@@ -17,20 +17,7 @@ public struct ReminderListTool: ToolProtocol {
         #if canImport(EventKit) && os(iOS)
         let store = EKEventStore()
 
-        let granted: Bool
-        if #available(iOS 17, *) {
-            granted = try await store.requestFullAccessToReminders()
-        } else {
-            granted = try await withCheckedThrowingContinuation { cont in
-                store.requestAccess(to: .reminder) { ok, err in
-                    if let err {
-                        cont.resume(throwing: err)
-                    } else {
-                        cont.resume(returning: ok)
-                    }
-                }
-            }
-        }
+        let granted = try await store.requestFullAccessToReminders()
         guard granted else {
             return "Reminders access not granted."
         }

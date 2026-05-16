@@ -22,7 +22,7 @@ public struct HealthKitSleepTool: ToolProtocol {
         guard let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else {
             return "Sleep type unavailable."
         }
-        try await store.requestAuthorization(toShare: [], read: [sleepType])
+        try await HealthKitAuth.requestRead(on: store)
 
         let calendar = Calendar.current
         let now = Date()

@@ -4,15 +4,18 @@ public struct OpenAICompatibleClient: LLMClient {
     public let apiKey: String
     public let baseURL: URL
     public let urlSession: URLSession
+    public let debugLogging: Bool
 
     public init(
         apiKey: String,
         baseURL: URL,
-        urlSession: URLSession = .shared
+        urlSession: URLSession = .shared,
+        debugLogging: Bool = false
     ) {
         self.apiKey = apiKey
         self.baseURL = baseURL
         self.urlSession = urlSession
+        self.debugLogging = debugLogging
     }
 
     public static func glm(apiKey: String) -> OpenAICompatibleClient {
@@ -69,13 +72,25 @@ public struct OpenAICompatibleClient: LLMClient {
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
+        AgentDebug.log(
+            "→ POST \(request.url?.absoluteString ?? "?") auth=Authorization-Bearer key=\(AgentDebug.mask(apiKey)) model=\(model) messages=\(openAIMessages.count) tools=\(tools?.count ?? 0) bodyBytes=\(request.httpBody?.count ?? 0)",
+            enabled: debugLogging
+        )
+
         let (data, response) = try await urlSession.data(for: request)
         guard let http = response as? HTTPURLResponse else {
+            AgentDebug.log("← non-HTTP response", enabled: debugLogging)
             throw AgentError.invalidResponse
         }
+
+        let bodyText = String(data: data, encoding: .utf8) ?? "<non-utf8 \(data.count) bytes>"
+        AgentDebug.log(
+            "← HTTP \(http.statusCode) bytes=\(data.count) body=\(AgentDebug.truncate(bodyText))",
+            enabled: debugLogging
+        )
+
         guard (200..<300).contains(http.statusCode) else {
-            let text = String(data: data, encoding: .utf8) ?? "<no body>"
-            throw AgentError.httpError(status: http.statusCode, body: text)
+            throw AgentError.httpError(status: http.statusCode, body: bodyText)
         }
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw AgentError.invalidResponse

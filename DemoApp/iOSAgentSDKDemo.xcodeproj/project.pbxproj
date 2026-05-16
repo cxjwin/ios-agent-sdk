@@ -286,6 +286,8 @@
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "读取你今天的日历事件用于晨间播报";
 				INFOPLIST_KEY_NSContactsUsageDescription = "读取联系人用于演示 agent 联系搜索";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "读取你的睡眠数据用于演示 agent 工具调用";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "需要你的当前位置用于天气查询和地图搜索演示";
+				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "读取和创建提醒事项用于演示 agent 工具调用";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -326,6 +328,8 @@
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "读取你今天的日历事件用于晨间播报";
 				INFOPLIST_KEY_NSContactsUsageDescription = "读取联系人用于演示 agent 联系搜索";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "读取你的睡眠数据用于演示 agent 工具调用";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "需要你的当前位置用于天气查询和地图搜索演示";
+				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "读取和创建提醒事项用于演示 agent 工具调用";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
